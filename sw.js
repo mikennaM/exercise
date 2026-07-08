@@ -1,4 +1,4 @@
-const CACHE = "ecotone-v2";
+const CACHE = "ecotone-v3";
 const ASSETS = [
   "./",
   "./index.html",
