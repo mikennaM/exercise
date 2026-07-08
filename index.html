@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>Understory — Workout Log</title>
+<title>Ecotone — Workout Log</title>
 <meta name="theme-color" content="#161D19" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -15,7 +15,7 @@
 <div id="app">
 
   <div class="topbar">
-    <div class="brand"><span class="outline">under</span>story</div>
+    <div class="brand"><span class="outline">eco</span>tone</div>
     <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙</button>
   </div>
 
@@ -35,7 +35,11 @@
 
   <!-- WORKOUTS (templates) -->
   <section class="screen hidden" id="screen-workouts">
-    <div class="section-title">Your workouts</div>
+    <div class="section-title" style="margin-top:0;">Summary</div>
+    <div class="chip-group" id="summaryPeriodChips"></div>
+    <div id="summaryContent"></div>
+
+    <div class="section-title">Your workouts, by type</div>
     <div id="workoutList"></div>
     <button class="btn ghost" id="newWorkoutBtn" style="margin-top:14px;">+ Build a new workout</button>
   </section>
@@ -67,6 +71,13 @@
       <div class="field"><label>Gyms (climb)</label><div class="chip-group" id="gymChips"></div></div>
       <div class="field"><label>Studios (yoga)</label><div class="chip-group" id="studioChips"></div></div>
       <div class="field"><label>Surf spots</label><div class="chip-group" id="spotChips"></div></div>
+    </div>
+
+    <div class="section-title">Timer notifications</div>
+    <div class="card">
+      <p class="card-sub" style="margin-bottom:12px;" id="notifStatus">Get notified when a rest timer finishes, even if your screen is off.</p>
+      <button class="btn secondary" id="enableNotifBtn">Enable notifications</button>
+      <p class="card-sub" style="margin-top:10px;">Note: iPhones can delay or skip this if the app has been closed for a while — most reliable when Understory is open or recently backgrounded, not force-quit.</p>
     </div>
 
     <div class="section-title">Install</div>

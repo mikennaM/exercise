@@ -80,6 +80,7 @@
   --c-yoga: #C68FB0;
   --c-hike: #6E8F7B;
   --c-surf: #7C93D6;
+  --c-fredo: #D6B98C;
 }
 
 * { box-sizing: border-box; }
@@ -108,18 +109,25 @@ input, select, textarea {
 
 /* ---- Header ---- */
 .topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 20px 10px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: calc(16px + env(safe-area-inset-top)) 20px 10px; gap: 12px;
 }
 .brand {
-  font-size: 22px; letter-spacing: 0.06em; text-transform: lowercase;
+  font-size: 22px; letter-spacing: 0.02em; text-transform: lowercase;
+  line-height: 1.25; word-break: break-word;
+}
+@media (max-width: 400px) {
+  .brand { font-size: 18px; }
+}
+@media (max-width: 360px) {
+  .brand { font-size: 16px; }
 }
 .brand .outline { font-family: "Minya Outline"; color: var(--primary); }
 .icon-btn {
   background: var(--surface-2); border: 1px solid var(--border);
-  color: var(--text); width: 38px; height: 38px; border-radius: 50%;
+  color: var(--text); width: 38px; height: 38px; min-width: 38px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px; cursor: pointer;
+  font-size: 16px; cursor: pointer; flex-shrink: 0;
 }
 .icon-btn:active { transform: scale(0.94); }
 
@@ -156,7 +164,8 @@ input, select, textarea {
 
 .legend { display: flex; flex-wrap: wrap; gap: 10px 14px; margin: 18px 0 6px; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
-.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.legend-icon { width: 15px; height: 15px; display: inline-flex; flex-shrink: 0; }
+.legend-icon svg { width: 100%; height: 100%; display: block; }
 
 /* ---- Sections / cards ---- */
 .section-title {
@@ -172,8 +181,11 @@ input, select, textarea {
 .card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 .type-badge {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
-  padding: 3px 8px; border-radius: 100px; color: var(--bg);
+  padding: 4px 9px 4px 6px; border-radius: 100px; color: var(--bg);
+  display: inline-flex; align-items: center; gap: 4px;
 }
+.badge-icon { width: 12px; height: 12px; display: inline-flex; flex-shrink: 0; }
+.badge-icon svg { width: 100%; height: 100%; display: block; }
 .empty-state { color: var(--text-muted); font-size: 14px; padding: 30px 4px; text-align: center; line-height: 1.6; }
 
 /* ---- Type matrix (grid of buttons) ---- */
@@ -186,7 +198,8 @@ input, select, textarea {
   cursor: pointer; color: var(--text); font-size: 14px;
 }
 .matrix-btn:active { transform: scale(0.97); }
-.matrix-dot { width: 16px; height: 16px; border-radius: 50%; }
+.matrix-icon { width: 30px; height: 30px; display: inline-flex; }
+.matrix-icon svg { width: 100%; height: 100%; display: block; }
 
 /* ---- Forms ---- */
 .field { margin-bottom: 16px; }
@@ -237,6 +250,7 @@ input, select, textarea {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
   background: var(--surface); border-top: 1px solid var(--border);
   display: flex; justify-content: center;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .bottom-nav-inner { max-width: 480px; width: 100%; display: flex; }
 .nav-btn {
@@ -254,9 +268,18 @@ input, select, textarea {
 .sheet-backdrop.hidden { display: none; }
 .sheet {
   background: var(--bg); border-radius: 20px 20px 0 0; max-width: 480px; width: 100%;
-  max-height: 88vh; overflow-y: auto; padding: 18px 20px 30px;
+  max-height: 88vh; overflow-y: auto; padding: 18px 20px calc(30px + env(safe-area-inset-bottom));
 }
 .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 4px; margin: 0 auto 14px; }
+.sheet-topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.back-link { background: none; border: none; color: var(--text-muted); font-size: 14px; cursor: pointer; padding: 4px 0; display: flex; align-items: center; gap: 4px; }
+.resume-banner {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px; margin-bottom: 16px;
+}
+.resume-banner p { margin: 0 0 10px; font-size: 13px; color: var(--text-muted); }
+.detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.detail-row:first-child { border-top: none; }
 
 /* ---- Theme picker ---- */
 .theme-grid { display: flex; gap: 12px; margin-top: 8px; }
@@ -276,6 +299,18 @@ input, select, textarea {
 
 .route-card { background: var(--surface-2); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
 .route-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+
+/* ---- Summary tab ---- */
+.summary-block { margin-bottom: 18px; }
+.summary-block-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.summary-type-icon { width: 18px; height: 18px; display: inline-flex; flex-shrink: 0; }
+.summary-type-icon svg { width: 100%; height: 100%; display: block; }
+.summary-block-title { font-size: 14px; }
+.summary-row { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.summary-row:first-child { border-top: none; }
+.group-header { display: flex; align-items: center; gap: 8px; margin: 20px 0 8px; }
+.group-header .summary-type-icon { width: 15px; height: 15px; }
+.group-header span.label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
 
 .dropdown-add { display: flex; gap: 8px; margin-top: 8px; }
 .dropdown-add input { flex: 1; }

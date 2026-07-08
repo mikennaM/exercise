@@ -1,4 +1,4 @@
-const CACHE = "understory-v1";
+const CACHE = "ecotone-v2";
 const ASSETS = [
   "./",
   "./index.html",
