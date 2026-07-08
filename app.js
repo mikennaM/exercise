@@ -133,10 +133,10 @@ function showScreen(name) {
   document.querySelectorAll(".nav-btn[data-screen]").forEach((b) => {
     b.classList.toggle("active", b.dataset.screen === name);
   });
-  if (name === "workouts") { renderSummary(); renderWorkoutList(); }
+  if (name === "workouts") renderWorkoutList();
   if (name === "routines") renderRoutineList();
   if (name === "settings") renderSettings();
-  if (name === "home") renderCalendar();
+  if (name === "home") { renderCalendar(); renderSummary(); }
 }
 
 document.querySelectorAll(".nav-btn[data-screen]").forEach((b) => {
@@ -282,23 +282,23 @@ function sessionSummaryLine(s) {
   }
 }
 
-function openSessionDetail(sessionId) {
-  const s = state.sessions.find((x) => x.id === sessionId);
-  if (!s) return;
-  const t = TYPES[s.type];
-  let bodyHTML = "";
-
+function sessionDetailBodyHTML(s) {
   if (s.type === "strength") {
-    bodyHTML = (s.exercises||[]).map((ex) => `
+    const order = computeSupersetOrder(s.exercises||[]);
+    const exCard = (ex) => `
       <div class="exercise-card">
         <div class="exercise-name"><span>${escapeHTML(ex.name)}</span><span class="card-sub">${formatDuration(ex.durationSec||0)}</span></div>
         ${(ex.sets||[]).map((set,i) => `
-          <div class="detail-row"><span>Set ${i+1} · ${escapeHTML(set.equipment||"")}</span><span>${escapeHTML(set.weight||"–")} lb × ${escapeHTML(set.reps||"–")}</span></div>
+          <div class="detail-row"><span>Set ${i+1} · ${escapeHTML(set.equipment||"")}</span><span>${escapeHTML(set.weight||"–")} lb × ${escapeHTML(set.reps||"–")}${set.repsMode==="each_side"?" (each side)":""}</span></div>
           ${set.notes ? `<div class="card-sub" style="padding-bottom:6px;">${escapeHTML(set.notes)}</div>` : ""}
         `).join("")}
-      </div>`).join("") || `<p class="card-sub">No exercises recorded.</p>`;
+      </div>`;
+    return order.length ? order.map((item) => {
+      if (item.type === "solo") return exCard(s.exercises[item.index]);
+      return `<div class="superset-block"><div class="superset-label">Superset ${item.number}</div>${item.indices.map((i) => exCard(s.exercises[i])).join("")}</div>`;
+    }).join("") : `<p class="card-sub">No exercises recorded.</p>`;
   } else if (s.type === "bike" || s.type === "run" || s.type === "hike") {
-    bodyHTML = `
+    return `
       <div class="card">
         ${s.start ? `<div class="detail-row"><span>Start</span><span>${escapeHTML(s.start)}</span></div>` : ""}
         <div class="detail-row"><span>Duration</span><span>${escapeHTML(s.duration||"–")}</span></div>
@@ -306,7 +306,7 @@ function openSessionDetail(sessionId) {
         <div class="detail-row"><span>Distance</span><span>${escapeHTML(String(s.distance||"–"))} mi</span></div>
       </div>`;
   } else if (s.type === "climb") {
-    bodyHTML = `
+    return `
       <div class="card">
         <div class="detail-row"><span>Start</span><span>${escapeHTML(s.start||"–")}</span></div>
         <div class="detail-row"><span>Gym</span><span>${escapeHTML(s.gym||"–")}</span></div>
@@ -318,7 +318,7 @@ function openSessionDetail(sessionId) {
         </div>`).join("")}
     `;
   } else if (s.type === "yoga") {
-    bodyHTML = `
+    return `
       <div class="card">
         <div class="detail-row"><span>Style</span><span>${escapeHTML(s.style||"–")}</span></div>
         <div class="detail-row"><span>Class</span><span>${escapeHTML(s.className||"–")}</span></div>
@@ -326,7 +326,7 @@ function openSessionDetail(sessionId) {
         <div class="detail-row"><span>Studio</span><span>${escapeHTML(s.studio||"–")}</span></div>
       </div>`;
   } else if (s.type === "surf") {
-    bodyHTML = `
+    return `
       <div class="card">
         <div class="detail-row"><span>Board</span><span>${escapeHTML(s.board||"–")}</span></div>
         <div class="detail-row"><span>Wave size</span><span>${escapeHTML(String(s.waveSize||"–"))} ft</span></div>
@@ -334,18 +334,24 @@ function openSessionDetail(sessionId) {
         <div class="detail-row"><span>Spot</span><span>${escapeHTML(s.spot||"–")}</span></div>
       </div>`;
   } else if (s.type === "fredo") {
-    bodyHTML = `
+    return `
       <div class="card">
         <div class="detail-row"><span>Duration</span><span>${escapeHTML(s.duration||"–")}</span></div>
         <div class="detail-row"><span>Distance</span><span>${escapeHTML(String(s.distance||"–"))} mi</span></div>
       </div>`;
   }
+  return "";
+}
 
+function openSessionDetail(sessionId) {
+  const s = state.sessions.find((x) => x.id === sessionId);
+  if (!s) return;
+  const t = TYPES[s.type];
   const html = `
     <div class="sheet-topline"><span></span></div>
     <h3 style="margin-bottom:2px;">${escapeHTML(s.workoutName)}</h3>
     <p class="card-sub" style="margin-bottom:16px;">${t.label} · ${fmtDate(s.date)}</p>
-    ${bodyHTML}
+    ${sessionDetailBodyHTML(s)}
     <button class="btn danger" id="deleteSessionBtn" style="margin-top:16px;">Delete this entry</button>
   `;
   openSheet(html);
@@ -436,6 +442,31 @@ function openTemplatePicker(type) {
 }
 
 /* ===================== LOG FORM (per type) ===================== */
+function lastSessionDataFor(workout) {
+  const sessions = state.sessions.filter((s) => s.workoutId === workout.id)
+    .sort((a,b) => (a.date+a.createdAt).localeCompare(b.date+b.createdAt));
+  const last = sessions[sessions.length - 1];
+  if (!last) return null;
+  const type = workout.type;
+  if (type === "strength") {
+    return { exercises: (last.exercises||[]).map((ex) => ({
+      name: ex.name, durationSec: 0, supersetGroup: ex.supersetGroup || null,
+      sets: (ex.sets||[]).map((s) => ({ ...s })),
+    })) };
+  } else if (type === "bike" || type === "run" || type === "hike") {
+    return { start: last.start, duration: last.duration, flat: last.elevation === "Flat", elevation: last.elevation, distance: last.distance };
+  } else if (type === "climb") {
+    return { start: last.start, gym: last.gym, routes: (last.routes||[]).map((r) => ({ ...r })) };
+  } else if (type === "yoga") {
+    return { style: last.style, className: last.className, duration: last.duration, studio: last.studio };
+  } else if (type === "surf") {
+    return { board: last.board, waveSize: last.waveSize, duration: last.duration, spot: last.spot };
+  } else if (type === "fredo") {
+    return { duration: last.duration, distance: last.distance };
+  }
+  return null;
+}
+
 function openLogForm(workout, opts) {
   opts = opts || {};
   const type = workout.type;
@@ -463,24 +494,25 @@ function openLogForm(workout, opts) {
     return;
   }
 
+  const initialData = draft ? draft.data : lastSessionDataFor(workout);
   const dateVal = (draft && draft.date) || todayISO();
   let bodyHTML = "";
 
-  if (type === "strength") bodyHTML = strengthFormHTML(draft && draft.data);
-  else if (type === "bike") bodyHTML = cardioFormHTML(true, draft && draft.data);
-  else if (type === "run") bodyHTML = cardioFormHTML(false, draft && draft.data);
-  else if (type === "hike") bodyHTML = cardioFormHTML(false, draft && draft.data);
-  else if (type === "climb") bodyHTML = climbFormHTML(draft && draft.data);
-  else if (type === "yoga") bodyHTML = yogaFormHTML(draft && draft.data);
-  else if (type === "surf") bodyHTML = surfFormHTML(draft && draft.data);
-  else if (type === "fredo") bodyHTML = fredoFormHTML(draft && draft.data);
+  if (type === "strength") bodyHTML = strengthFormHTML(initialData);
+  else if (type === "bike") bodyHTML = cardioFormHTML(true, initialData);
+  else if (type === "run") bodyHTML = cardioFormHTML(false, initialData);
+  else if (type === "hike") bodyHTML = cardioFormHTML(false, initialData);
+  else if (type === "climb") bodyHTML = climbFormHTML(initialData);
+  else if (type === "yoga") bodyHTML = yogaFormHTML(initialData);
+  else if (type === "surf") bodyHTML = surfFormHTML(initialData);
+  else if (type === "fredo") bodyHTML = fredoFormHTML(initialData);
 
   const html = `
     <div class="sheet-topline">
       <button class="back-link" id="backToPicker">‹ Back</button>
     </div>
     <h3 style="margin-bottom:2px;">${escapeHTML(workout.name)}</h3>
-    <p class="card-sub" style="margin-bottom:16px;">${TYPES[type].label} · logging a session</p>
+    <p class="card-sub" style="margin-bottom:16px;">${TYPES[type].label} · logging a session${!draft && initialData ? " · pre-filled from your last entry" : ""}</p>
     <div class="field"><label>Date</label><input type="date" id="logDate" value="${dateVal}" /></div>
     ${bodyHTML}
     <button class="btn" id="saveSessionBtn" style="margin-top:6px;">Finish workout</button>
@@ -489,7 +521,7 @@ function openLogForm(workout, opts) {
   sheetEl.querySelector("#backToPicker").addEventListener("click", () => {
     if (confirm("Your progress is saved as a draft — you can resume later. Go back?")) openTemplatePicker(type);
   });
-  wireLogFormEvents(type, workout, draft && draft.data);
+  wireLogFormEvents(type, workout, initialData);
   sheetEl.querySelector("#logDate").addEventListener("change", () => persistCurrentDraft(workout, type));
   sheetEl.querySelector("#saveSessionBtn").addEventListener("click", () => saveSession(workout));
 }
@@ -498,7 +530,7 @@ function persistCurrentDraft(workout, type) {
   const date = sheetEl.querySelector("#logDate").value || todayISO();
   let data = null;
   if (type === "strength") {
-    data = { exercises: strengthExercises.map((ex) => ({ name: ex.name, durationSec: ex.durationSec, sets: ex.sets })) };
+    data = { exercises: strengthExercises.map((ex) => ({ name: ex.name, durationSec: ex.durationSec, supersetGroup: ex.supersetGroup || null, sets: ex.sets })) };
   } else if (type === "bike" || type === "run" || type === "hike") {
     const flatChip = sheetEl.querySelector("#flatChip");
     data = {
@@ -535,15 +567,49 @@ function persistCurrentDraft(workout, type) {
 
 /* ---- Strength ---- */
 let strengthExercises = [];
+
+function getKnownExerciseNames() {
+  const names = new Set();
+  state.sessions.forEach((s) => { if (s.type === "strength") (s.exercises||[]).forEach((ex) => { if (ex.name) names.add(ex.name); }); });
+  return [...names].sort((a,b) => a.localeCompare(b));
+}
+
+// Groups exercises into a display order: superset blocks (sequentially numbered
+// by first appearance) interleaved with standalone exercises.
+function computeSupersetOrder(exercises) {
+  const order = [];
+  const seen = new Map();
+  exercises.forEach((ex, i) => {
+    if (ex.supersetGroup) {
+      if (!seen.has(ex.supersetGroup)) {
+        const number = seen.size + 1;
+        seen.set(ex.supersetGroup, number);
+        order.push({ type: "group", key: ex.supersetGroup, number, indices: [i] });
+      } else {
+        const number = seen.get(ex.supersetGroup);
+        const block = order.find((o) => o.type === "group" && o.key === ex.supersetGroup);
+        block.indices.push(i);
+      }
+    } else {
+      order.push({ type: "solo", index: i });
+    }
+  });
+  return order;
+}
+
 function strengthFormHTML(draftData) {
   strengthExercises = draftData && draftData.exercises
-    ? draftData.exercises.map((ex) => ({ name: ex.name, durationSec: ex.durationSec || 0, sets: ex.sets, timerRunning: false, timerStart: null }))
+    ? draftData.exercises.map((ex) => ({ name: ex.name, durationSec: ex.durationSec || 0, supersetGroup: ex.supersetGroup || null, sets: ex.sets, timerRunning: false, timerStart: null }))
     : [];
+  const knownNames = getKnownExerciseNames();
   return `
     <div class="section-title" style="margin-top:0;">Exercises</div>
     <div id="exerciseList"></div>
     <div class="dropdown-add" style="margin-bottom:14px;">
-      <input type="text" id="newExerciseName" placeholder="Exercise name, e.g. Bench Press" />
+      <input type="text" id="newExerciseName" list="exerciseNamesList" placeholder="Exercise name, e.g. Bench Press" />
+      <datalist id="exerciseNamesList">
+        ${knownNames.map((n) => `<option value="${escapeHTML(n)}"></option>`).join("")}
+      </datalist>
       <button id="addExerciseBtn" type="button">Add</button>
     </div>
   `;
@@ -551,10 +617,23 @@ function strengthFormHTML(draftData) {
 function wireStrength(workout) {
   const listEl = document.getElementById("exerciseList");
   function render() {
-    listEl.innerHTML = strengthExercises.map((ex, i) => exerciseCardHTML(ex, i)).join("");
+    const order = computeSupersetOrder(strengthExercises);
+    listEl.innerHTML = order.map((item) => {
+      if (item.type === "solo") {
+        return exerciseCardHTML(strengthExercises[item.index], item.index, strengthExercises.length);
+      }
+      const cards = item.indices.map((i) => exerciseCardHTML(strengthExercises[i], i, strengthExercises.length)).join("");
+      return `<div class="superset-block">
+        <div class="superset-label">Superset ${item.number}</div>
+        ${cards}
+      </div>`;
+    }).join("");
+
     listEl.querySelectorAll("[data-add-set]").forEach((b) => b.addEventListener("click", () => {
       const i = +b.dataset.addSet;
-      strengthExercises[i].sets.push({ reps: "", weight: "", equipment: EQUIPMENT[0], notes: "" });
+      const sets = strengthExercises[i].sets;
+      const prev = sets[sets.length - 1];
+      sets.push(prev ? { ...prev } : { reps: "", weight: "", equipment: EQUIPMENT[0], notes: "", repsMode: "total" });
       render(); persistCurrentDraft(workout, "strength");
     }));
     listEl.querySelectorAll("[data-remove-ex]").forEach((b) => b.addEventListener("click", () => {
@@ -571,25 +650,46 @@ function wireStrength(workout) {
         persistCurrentDraft(workout, "strength");
       });
     });
+    listEl.querySelectorAll("[data-repsmode]").forEach((b) => b.addEventListener("click", () => {
+      const [ei, si] = b.dataset.repsmode.split("-").map(Number);
+      strengthExercises[ei].sets[si].repsMode = b.dataset.mode;
+      render(); persistCurrentDraft(workout, "strength");
+    }));
     listEl.querySelectorAll("[data-timer]").forEach((b) => b.addEventListener("click", () => { toggleExerciseTimer(+b.dataset.timer, render); persistCurrentDraft(workout, "strength"); }));
     listEl.querySelectorAll("[data-rest]").forEach((b) => b.addEventListener("click", () => startRestTimer(b)));
+    listEl.querySelectorAll("[data-superset-join]").forEach((b) => b.addEventListener("click", () => {
+      const i = +b.dataset.supersetJoin;
+      const prevEx = strengthExercises[i - 1];
+      strengthExercises[i].supersetGroup = prevEx.supersetGroup || uid();
+      prevEx.supersetGroup = strengthExercises[i].supersetGroup;
+      render(); persistCurrentDraft(workout, "strength");
+    }));
+    listEl.querySelectorAll("[data-superset-leave]").forEach((b) => b.addEventListener("click", () => {
+      strengthExercises[+b.dataset.supersetLeave].supersetGroup = null;
+      render(); persistCurrentDraft(workout, "strength");
+    }));
   }
   document.getElementById("addExerciseBtn").addEventListener("click", () => {
     const inp = document.getElementById("newExerciseName");
     const name = inp.value.trim();
     if (!name) { inp.focus(); return; }
-    strengthExercises.push({ name, sets: [{ reps:"", weight:"", equipment: EQUIPMENT[0], notes:"" }], durationSec: 0, timerRunning: false, timerStart: null });
+    strengthExercises.push({ name, sets: [{ reps:"", weight:"", equipment: EQUIPMENT[0], notes:"", repsMode: "total" }], durationSec: 0, supersetGroup: null, timerRunning: false, timerStart: null });
     inp.value = "";
     render(); persistCurrentDraft(workout, "strength");
   });
   render();
 }
-function exerciseCardHTML(ex, i) {
+function exerciseCardHTML(ex, i, total) {
   return `
     <div class="exercise-card">
       <div class="exercise-name">
         <span>${escapeHTML(ex.name)}</span>
         <button class="remove-x" data-remove-ex="${i}">✕</button>
+      </div>
+      <div style="margin-bottom:10px;">
+        ${ex.supersetGroup
+          ? `<button class="back-link" data-superset-leave="${i}">Remove from superset</button>`
+          : (i > 0 ? `<button class="back-link" data-superset-join="${i}">+ Superset with previous exercise</button>` : "")}
       </div>
       <div class="timer-box">
         <div class="timer-display" id="exTimerDisplay-${i}">${formatDuration(ex.durationSec)}</div>
@@ -608,6 +708,10 @@ function exerciseCardHTML(ex, i) {
           </select>
           <input type="number" placeholder="lbs" data-set="${i}-${si}" data-field="weight" value="${s.weight}" />
           <input type="number" placeholder="reps" data-set="${i}-${si}" data-field="reps" value="${s.reps}" />
+        </div>
+        <div class="chip-group" style="margin:-2px 0 8px 34px;">
+          <div class="chip small ${(!s.repsMode || s.repsMode==='total')?'selected':''}" data-repsmode="${i}-${si}" data-mode="total">Total</div>
+          <div class="chip small ${s.repsMode==='each_side'?'selected':''}" data-repsmode="${i}-${si}" data-mode="each_side">Each side</div>
         </div>
         <div class="set-row" style="grid-template-columns: 26px 1fr 26px;">
           <span></span>
@@ -931,7 +1035,7 @@ function saveSession(workout) {
 
   if (type === "strength") {
     strengthExercises.forEach((ex) => { if (ex.timerRunning) { ex.durationSec += Math.floor((Date.now()-ex.timerStart)/1000); ex.timerRunning=false; } });
-    session = { ...base, exercises: strengthExercises.map((ex) => ({ name: ex.name, durationSec: ex.durationSec, sets: ex.sets })) };
+    session = { ...base, exercises: strengthExercises.map((ex) => ({ name: ex.name, durationSec: ex.durationSec, supersetGroup: ex.supersetGroup || null, sets: ex.sets })) };
   } else if (type === "bike" || type === "run" || type === "hike") {
     const duration = sheetEl.querySelector("#cDuration").value;
     const flat = sheetEl.querySelector("#flatChip").classList.contains("selected");
@@ -988,11 +1092,12 @@ function renderWorkoutList() {
       const hasDraft = !!loadDraft(w.id);
       return `
         <div class="card">
-          <div class="card-row">
+          <div class="card-row" data-view-workout="${w.id}" style="cursor:pointer;">
             <div>
               <div class="card-title">${escapeHTML(w.name)}</div>
               <div class="card-sub">${count} session${count===1?"":"s"} logged${hasDraft ? " · unfinished entry" : ""}</div>
             </div>
+            <span class="card-sub">›</span>
           </div>
           <div class="btn-row" style="margin-top:12px;">
             <button class="btn secondary" data-log="${w.id}">${hasDraft ? "Resume" : "Log session"}</button>
@@ -1006,6 +1111,9 @@ function renderWorkoutList() {
     `;
   }).join("");
 
+  el.querySelectorAll("[data-view-workout]").forEach((row) => row.addEventListener("click", () => {
+    openWorkoutSummary(row.dataset.viewWorkout);
+  }));
   el.querySelectorAll("[data-log]").forEach((b) => b.addEventListener("click", () => {
     openLogForm(state.workouts.find((w) => w.id === b.dataset.log));
   }));
@@ -1015,6 +1123,49 @@ function renderWorkoutList() {
     state.workouts = state.workouts.filter((w) => w.id !== b.dataset.del);
     saveState(); renderWorkoutList();
   }));
+}
+
+function openWorkoutSummary(workoutId) {
+  const w = state.workouts.find((x) => x.id === workoutId);
+  if (!w) return;
+  const t = TYPES[w.type];
+  const sessions = state.sessions.filter((s) => s.workoutId === workoutId)
+    .sort((a,b) => (a.date+a.createdAt).localeCompare(b.date+b.createdAt));
+  const last = sessions[sessions.length - 1];
+
+  let progressionHTML = "";
+  if (w.type === "strength" && sessions.length) {
+    const progression = {};
+    sessions.forEach((s) => {
+      (s.exercises||[]).forEach((ex) => {
+        const weights = (ex.sets||[]).map((st) => parseFloat(st.weight)).filter((n) => !isNaN(n));
+        if (!weights.length) return;
+        const top = Math.max(...weights);
+        if (!progression[ex.name]) progression[ex.name] = { first: top, last: top };
+        else progression[ex.name].last = top;
+      });
+    });
+    const rows = Object.entries(progression).map(([name,p]) => {
+      const delta = p.last - p.first; const arrow = delta > 0 ? "↑" : delta < 0 ? "↓" : "→";
+      return summaryRow(name, `${p.first} → ${p.last} lbs ${arrow}`);
+    }).join("");
+    progressionHTML = `
+      <div class="section-title">All-time progression</div>
+      <div class="card">${rows || summaryEmpty("No weight data logged yet.")}</div>`;
+  }
+
+  const html = `
+    <div class="sheet-topline"><span></span></div>
+    <h3 style="margin-bottom:2px;">${escapeHTML(w.name)}</h3>
+    <p class="card-sub" style="margin-bottom:16px;">${t.label}</p>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-num">${sessions.length}</div><div class="stat-label">Sessions logged</div></div>
+      <div class="stat-box"><div class="stat-num">${last ? fmtDate(last.date) : "–"}</div><div class="stat-label">Most recent</div></div>
+    </div>
+    ${last ? `<div class="section-title">Most recently logged</div>${sessionDetailBodyHTML(last)}` : `<p class="empty-state">Nothing logged for this workout yet.</p>`}
+    ${progressionHTML}
+  `;
+  openSheet(html);
 }
 
 /* ===================== SUMMARY ===================== */
@@ -1371,6 +1522,7 @@ document.getElementById("importFile").addEventListener("change", (e) => {
 /* ===================== INIT ===================== */
 applyTheme();
 renderCalendar();
+renderSummary();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

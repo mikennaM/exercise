@@ -213,6 +213,7 @@ input, select, textarea {
 }
 .field textarea { resize: vertical; min-height: 64px; }
 .chip-group { display: flex; flex-wrap: wrap; gap: 9px; }
+#summaryPeriodChips { margin-bottom: 20px; }
 .chip {
   background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
   padding: 10px 16px; border-radius: 100px; font-size: 15px; cursor: pointer;
@@ -246,6 +247,10 @@ input, select, textarea {
 .set-row .set-idx { font-size: 14px; color: var(--text-muted); }
 .set-row input, .set-row select { padding: 10px; font-size: 15px; border-radius: 8px; background: var(--surface-3); border: 1px solid var(--border); color: var(--text); width: 100%; }
 .remove-x { background: none; border: none; color: var(--text-muted); font-size: 19px; cursor: pointer; padding: 6px 8px; }
+.chip.small { padding: 6px 12px; font-size: 13px; }
+.superset-block { border: 1px dashed var(--border); border-radius: 16px; padding: 12px 12px 2px; margin-bottom: 12px; }
+.superset-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary); margin-bottom: 8px; }
+.superset-block .exercise-card { margin-bottom: 10px; }
 
 /* ---- Bottom nav ---- */
 .bottom-nav {
